@@ -1,0 +1,16 @@
+{
+  "CL": {
+    "currency": "USD",
+    "exchange": "NYMEX",
+    "multiplier": "1000",
+    "symbol": "CL",
+    "tradingClass": "CL"
+  },
+  "GC": {
+    "currency": "USD",
+    "exchange": "COMEX",
+    "multiplier": "100",
+    "symbol": "GC",
+    "tradingClass": "GC"
+  }
+}
