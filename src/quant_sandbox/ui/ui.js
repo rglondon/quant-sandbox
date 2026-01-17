@@ -1623,6 +1623,37 @@ function normalizePoints(points) {
   return out;
 }
 
+function hasCandlestickSupport() {
+  try {
+    return !!Chart?.registry?.getController?.("candlestick");
+  } catch {
+    return false;
+  }
+}
+
+function normalizeCandles(bars) {
+  const out = [];
+  for (const b of (bars || [])) {
+    let t = b.t ?? b.time ?? b.ts ?? b.date ?? b.x;
+    let ms;
+    if (t instanceof Date) ms = t.getTime();
+    else if (typeof t === "number") ms = (t < 2e12) ? t * 1000 : t;
+    else {
+      const parsed = Date.parse(String(t));
+      if (!Number.isFinite(parsed)) continue;
+      ms = parsed;
+    }
+    const o = Number(b.o ?? b.open);
+    const h = Number(b.h ?? b.high);
+    const l = Number(b.l ?? b.low);
+    const c = Number(b.c ?? b.close);
+    if (!Number.isFinite(ms) || !Number.isFinite(o) || !Number.isFinite(h) || !Number.isFinite(l) || !Number.isFinite(c)) continue;
+    out.push({ x: ms, o, h, l, c });
+  }
+  out.sort((a, b) => a.x - b.x);
+  return out;
+}
+
 function normalizeSeriesXY(xy, mode, baseValue) {
   if ((!mode && mode !== 0) || !Array.isArray(xy) || !xy.length) return xy;
   if (typeof mode === "string" && /^(none|raw)$/i.test(mode)) return xy;
@@ -3186,12 +3217,12 @@ function ensureLastValuePlugin() {
         let last = null;
         if (cross?.active && Number.isFinite(cross.xValue)) {
           const pt = nearestPoint(data, cross.xValue);
-          const y = (pt && typeof pt === "object") ? pt.y : null;
+          const y = (pt && typeof pt === "object") ? (pt.y ?? pt.c) : null;
           if (Number.isFinite(Number(y))) last = { y: Number(y) };
         } else {
           for (let i = data.length - 1; i >= 0; i--) {
             const p = data[i];
-            const y = (p && typeof p === "object") ? p.y : Array.isArray(p) ? p[1] : p;
+            const y = (p && typeof p === "object") ? (p.y ?? p.c) : Array.isArray(p) ? p[1] : p;
             if (Number.isFinite(Number(y))) {
               last = { y: Number(y) };
               break;
@@ -4422,6 +4453,29 @@ async function fetchVolumeBars(symbol) {
   });
 }
 
+async function fetchCandles(symbol) {
+  const sym = String(symbol || "").trim();
+  if (!isSingleSymbol(sym)) {
+    throw new Error(`Candles need a single symbol like EQ:SPY, not: ${sym}`);
+  }
+
+  const durTok = state.base.durationToken || "3y";
+  const { start, end } = computeStartEndFromToken(durTok);
+  if (!state.base.start || !state.base.end) {
+    state.base.start = start;
+    state.base.end = end;
+  }
+
+  return postJSON("/data/ohlcv", {
+    symbol: sym,
+    resolution: barSizeToResolution(state.base.bar_size),
+    range: { start: state.base.start, end: state.base.end },
+    include_volume: false,
+    tz: "Europe/London",
+    max_bars: 5000,
+  });
+}
+
 async function fetchPanelSeries(kind) {
   const expr = state.base.expr;
   if (!expr) throw new Error("Run a price() command first.");
@@ -4914,7 +4968,10 @@ function toCSVFromPriceChart() {
 
   const maps = priceChart.data.datasets.map(d => {
     const m = new Map();
-    for (const p of (d.data || [])) m.set(p.x, p.y);
+    for (const p of (d.data || [])) {
+      const y = (p && typeof p === "object") ? (p.y ?? p.c) : p;
+      m.set(p.x, y);
+    }
     return m;
   });
 
@@ -4940,7 +4997,10 @@ function toTSVFromPriceChart() {
 
   const maps = priceChart.data.datasets.map(d => {
     const m = new Map();
-    for (const p of (d.data || [])) m.set(p.x, p.y);
+    for (const p of (d.data || [])) {
+      const y = (p && typeof p === "object") ? (p.y ?? p.c) : p;
+      m.set(p.x, y);
+    }
     return m;
   });
 
@@ -5028,6 +5088,18 @@ function renderPrice(priceResp) {
       expr,
     }];
 
+  const candleBars =
+    priceResp?.candles ??
+    priceResp?.bars ??
+    priceResp?.ohlc ??
+    priceResp?.ohlcv ??
+    null;
+  const useCandles = uiPrefs.chartType === "candles"
+    && hasCandlestickSupport()
+    && Array.isArray(candleBars)
+    && candleBars.length
+    && seriesList.length === 1;
+
   let baseRawXY = null;
   const normMode = state.base.norm;
   const normBaseValue = resolveNormBaseValue(normMode, seriesList);
@@ -5051,27 +5123,77 @@ function renderPrice(priceResp) {
   }
 
   const datasets = [];
-  for (let i = 0; i < seriesList.length; i++) {
-    const s = seriesList[i];
-    const rawXY = normalizePoints(s.points || []);
-    if (!rawXY.length) continue;
-    if (!baseRawXY) baseRawXY = rawXY;
+  if (useCandles) {
+    const rawCandles = normalizeCandles(candleBars);
+    if (rawCandles.length) {
+      const firstClose = rawCandles[0]?.c;
+      let candleXY = rawCandles;
+      if (Number.isFinite(firstClose) && normMode != null) {
+        if (normMode === 0) {
+          candleXY = rawCandles.map((p) => ({
+            x: p.x,
+            o: (p.o / firstClose - 1) * 100,
+            h: (p.h / firstClose - 1) * 100,
+            l: (p.l / firstClose - 1) * 100,
+            c: (p.c / firstClose - 1) * 100,
+          }));
+        } else if (typeof normMode === "number" && Number.isFinite(normMode)) {
+          const k = normMode / firstClose;
+          candleXY = rawCandles.map((p) => ({
+            x: p.x,
+            o: p.o * k,
+            h: p.h * k,
+            l: p.l * k,
+            c: p.c * k,
+          }));
+        }
+      }
 
-    const lbl = String(s.label || s.expr || `series_${i + 1}`);
-    const c = normalizeColor(dsColors[lbl], lbl);
-    dsColors[lbl] = c;
+      const lbl = String(seriesList[0]?.label || expr || "price");
+      const c = normalizeColor(dsColors[lbl], lbl);
+      dsColors[lbl] = c;
+      datasets.push({
+        type: "candlestick",
+        label: lbl,
+        data: candleXY,
+        yAxisID: axisIds[0],
+        borderColor: {
+          up: "rgba(16,185,129,.9)",
+          down: "rgba(239,68,68,.9)",
+          unchanged: "rgba(107,114,128,.9)",
+        },
+        color: {
+          up: "rgba(16,185,129,.45)",
+          down: "rgba(239,68,68,.45)",
+          unchanged: "rgba(107,114,128,.45)",
+        },
+        borderWidth: 1,
+      });
+      baseRawXY = candleXY.map((p) => ({ x: p.x, y: p.c }));
+    }
+  } else {
+    for (let i = 0; i < seriesList.length; i++) {
+      const s = seriesList[i];
+      const rawXY = normalizePoints(s.points || []);
+      if (!rawXY.length) continue;
+      if (!baseRawXY) baseRawXY = rawXY;
 
-    const xy = normalizeSeriesXY(rawXY, normMode, normBaseValue);
-    datasets.push({
-      label: lbl,
-      data: xy,
-      yAxisID: axisIds[i],
-      borderColor: c,
-      backgroundColor: "transparent",
-      borderWidth: 2,
-      pointRadius: 0,
-      tension: 0,
-    });
+      const lbl = String(s.label || s.expr || `series_${i + 1}`);
+      const c = normalizeColor(dsColors[lbl], lbl);
+      dsColors[lbl] = c;
+
+      const xy = normalizeSeriesXY(rawXY, normMode, normBaseValue);
+      datasets.push({
+        label: lbl,
+        data: xy,
+        yAxisID: axisIds[i],
+        borderColor: c,
+        backgroundColor: "transparent",
+        borderWidth: 2,
+        pointRadius: 0,
+        tension: 0,
+      });
+    }
   }
   saveJSON(DS_COLOR_KEY, dsColors);
 
@@ -6286,6 +6408,33 @@ async function runCommand(cmdText, opts = {}) {
       const multi = exprs.length > 1;
       state.base.norm = (parsed.norm != null) ? parsed.norm : (multi ? 0 : null);
 
+      const wantsCandles = uiPrefs.chartType === "candles";
+      let candleBars = null;
+      let candleExpr = null;
+      let candleWarn = null;
+      if (wantsCandles) {
+        if (exprs.length !== 1 || !isSingleSymbol(expr)) {
+          candleWarn = "Candles need a single symbol; using line chart.";
+        } else if (!hasCandlestickSupport()) {
+          candleWarn = "Candles unavailable (chartjs-chart-financial missing).";
+        } else {
+          try {
+            const resp = await fetchCandles(expr);
+            const bars =
+              resp?.bars ??
+              resp?.candles ??
+              resp?.ohlc ??
+              resp?.ohlcv ??
+              resp?.data;
+            candleBars = Array.isArray(bars) ? bars : null;
+            candleExpr = expr;
+            if (!candleBars?.length) candleWarn = "No candle data returned.";
+          } catch (err) {
+            candleWarn = String(err?.message || err || "Candles failed.");
+          }
+        }
+      }
+
       const errors = [];
       const series = [];
       for (const ex of exprs) {
@@ -6307,11 +6456,13 @@ async function runCommand(cmdText, opts = {}) {
       if (!series.length) {
         throw new Error(errors.join(" | ") || "No data returned.");
       }
-      const warn = errors.length ? errors.join(" | ") : null;
+      const warn = [errors.length ? errors.join(" | ") : null, candleWarn].filter(Boolean).join(" | ") || null;
 
-      const price = series.length === 1
-        ? { label: series[0].label, points: series[0].points }
-        : { label: expr, series };
+      const price = (candleBars && candleBars.length)
+        ? { label: candleExpr || expr, candles: candleBars }
+        : (series.length === 1
+          ? { label: series[0].label, points: series[0].points }
+          : { label: expr, series });
 
       if (isBasePrice) {
         state.data.price = price;
@@ -6319,13 +6470,21 @@ async function runCommand(cmdText, opts = {}) {
       }
 
       // IMPORTANT: do NOT reset xBounds if already zoomed
-      const pts = Array.isArray(price?.points) ? price.points : (price?.series?.[0]?.points || []);
+      const pts = Array.isArray(price?.points)
+        ? price.points
+        : (price?.series?.[0]?.points || []);
       const xy = normalizePoints(pts);
+      const candleXY = (price?.candles && Array.isArray(price.candles))
+        ? normalizeCandles(price.candles)
+        : [];
+      const xyForBounds = candleXY.length
+        ? candleXY.map((p) => ({ x: p.x, y: p.c }))
+        : xy;
       const shouldResetBounds = (!state.base.xBounds || expr !== prevExpr || durTok !== prevDurTok);
       if (shouldResetBounds) {
         const startMs = Number.isFinite(Date.parse(start || "")) ? Date.parse(start) : null;
         const endMs = Number.isFinite(Date.parse(end || "")) ? Date.parse(end) : null;
-        const fallback = computeXBoundsFromXY(xy);
+        const fallback = computeXBoundsFromXY(xyForBounds);
         state.base.xBounds = {
           xMin: (startMs != null) ? startMs : fallback?.xMin,
           xMax: (endMs != null) ? endMs : fallback?.xMax,
