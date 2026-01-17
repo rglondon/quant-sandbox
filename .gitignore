@@ -1,16 +1,15 @@
-# Python
-__pycache__/
-*.py[cod]
-
-# Virtual environments
-.venv/
-
-# Environment variables
 .env
-
-# Editor / OS
-.vscode/
+.env.*
+*.key
+*.pem
+__pycache__/
+*.pyc
 .DS_Store
-
-# Logs
-*.log
+.vscode/
+.idea/
+.venv/
+out/
+node_modules/
+*.save
+*.docx
+src/quant_sandbox/api/ui_tmp/

@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Quant Sandbox — Console</title>
+  <link rel="icon" href="data:," />
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <!-- Financial chart types (candlesticks) -->
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.2.0/dist/chartjs-chart-financial.min.js"></script>
+
+  <!-- Zoom/pan plugin -->
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+
+  <!-- UI styles -->
+  <link rel="stylesheet" href="./ui.css" />
+</head>
+
+<body>
+  <div class="app">
+    <aside id="sidebar" class="sidebar">
+      <div class="qs-sidebar-grab" title="Resize sidebar"></div>
+      <div class="sidebar-rail">
+        <div class="brand">
+          <div class="logo">QS</div>
+        </div>
+
+        <!-- Icons that remain visible when collapsed -->
+        <div class="sidebar-icons">
+          <button class="sicon" data-module="charting" title="Charting">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 19V5M4 19H20M7 15l4-5 3 3 5-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+            </svg>
+          </button>
+          <button class="sicon" data-module="portfolio" title="Portfolio Analysis">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="4" y="5" width="16" height="14" rx="1.5"></rect>
+              <path d="M8 9h8M8 13h8M8 17h5"></path>
+            </svg>
+          </button>
+          <button class="sicon" data-module="seasonality" title="Seasonality">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="4" y="6" width="16" height="14" rx="1.5"></rect>
+              <path d="M8 4v4M16 4v4M6 10h12"></path>
+            </svg>
+          </button>
+          <button class="sicon" data-module="regressions" title="Regressions">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 18h16M6 15l4-4 3 3 5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+            </svg>
+          </button>
+          <button class="sicon" data-module="market" title="Market Overview">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 18h16M6 16V8M12 16V6M18 16v-4"></path>
+            </svg>
+          </button>
+          <div class="sicon-divider"></div>
+          <button class="sicon" data-jump="history" title="History">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="8"></circle>
+              <path d="M12 7v6l4 2"></path>
+            </svg>
+          </button>
+          <button class="sicon" data-jump="library" title="Library">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 6h7l2 2h9v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6z"></path>
+            </svg>
+          </button>
+          <button class="sicon" data-jump="help" title="Help">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="8"></circle>
+              <path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 2-2 2-2 3"></path>
+              <circle cx="12" cy="16.5" r="1"></circle>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="sidebar-body">
+        <!-- History panel (collapsible) -->
+        <div class="panel" id="historyPanel">
+          <div class="panel-header">
+            <button class="panel-titlebtn" data-collapse="history">
+              <span class="panel-title">History</span>
+              <span class="pill" id="histCount">last 20</span>
+              <span class="panel-caret" id="historyCaret">▾</span>
+            </button>
+
+            <div class="panel-actions">
+              <button id="clearHistoryBtn" class="btn btn-ghost">Clear</button>
+            </div>
+          </div>
+          <div id="historyList" class="list"></div>
+        </div>
+
+        <!-- Library panel (collapsible) -->
+        <div class="panel" id="libraryPanel">
+          <div class="panel-header">
+            <button class="panel-titlebtn" data-collapse="library">
+              <span class="panel-title">Library</span>
+              <span class="panel-caret" id="libraryCaret">▾</span>
+            </button>
+
+            <div class="panel-actions">
+              <button id="newFolderBtn" class="btn btn-ghost">+ Folder</button>
+              <button id="exportBtn" class="btn btn-ghost">Export</button>
+              <label class="btn btn-ghost filebtn">
+                Import
+                <input id="importInput" type="file" accept="application/json" />
+              </label>
+            </div>
+          </div>
+          <div id="libraryTree" class="list"></div>
+        </div>
+
+        <!-- Help panel (collapsible) -->
+        <div class="panel" id="helpPanel">
+          <div class="panel-header">
+            <button class="panel-titlebtn" data-collapse="help">
+              <span class="panel-title">Help</span>
+              <span class="panel-caret" id="helpCaret">▾</span>
+            </button>
+          </div>
+          <div id="helpList" class="help-list list">
+            <div class="help-item">price(EXPR, [DUR], norm=0|100|SYMBOL|raw)</div>
+            <div class="help-item">volume(SYMBOL, [MA], [DUR])</div>
+            <div class="help-item">rsi(EXPR, [PERIOD], [DUR])</div>
+            <div class="help-item">dd(EXPR, [WINDOW], [DUR])</div>
+            <div class="help-item">sharpe(EXPR, [WINDOW], [DUR])</div>
+            <div class="help-item">zscore(EXPR, [WINDOW], [DUR])</div>
+            <div class="help-item">seasonality(EXPR, mode=heatmap|years, bucket=month|week)</div>
+            <div class="help-item">seasonality(EQ:SPY, mode=heatmap, bucket=month, years=10)</div>
+            <div class="help-item">seasonality(EQ:SPY, mode=years, years=2018-2024)</div>
+            <div class="help-item">seasonality(IX:SPX, mode=years, years=2026,2022,2018, start=01-01, end=12-31)</div>
+            <div class="help-item">seasonality(IX:SPX, years=2026,2022,2018)</div>
+            <div class="help-item">Examples:</div>
+            <div class="help-item">price(EQ:SPY, 1Y)</div>
+            <div class="help-item">price(EQ:SPY, EQ:QQQ, 1Y, norm=0)</div>
+            <div class="help-item">price(EQ:SPY, EQ:QQQ, 1Y, norm=100)</div>
+            <div class="help-item">rsi(EQ:NVDA, 14, 1Y)</div>
+            <div class="help-item">volume(EQ:NVDA, 20, 1Y)</div>
+          </div>
+        </div>
+
+        <div class="sidebar-footer">
+          <div class="muted">Tip: History auto-saves. Use Save to store to Library.</div>
+          <div id="apiStatus" class="status-dot">● OK</div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="module module-charting active" data-module="charting">
+        <div class="charting-layout">
+          <div class="charting-selections">
+            <div class="charting-section">
+              <div class="charting-header">
+                <div class="charting-label">SELECT ASSET</div>
+              </div>
+              <div class="charting-input-row">
+                <input id="chartingAssetInput" class="charting-input" type="text" placeholder="EQ:SPY" />
+                <button id="chartingAddTickerBtn" class="btn btn-ghost">Add</button>
+              </div>
+              <div id="chartingTickerList" class="charting-list"></div>
+              <button id="chartingAddTickerMore" class="btn btn-ghost">+ Add Ticker</button>
+            </div>
+
+            <div class="charting-section">
+              <div class="charting-section-title">Metrics</div>
+              <div class="charting-metric-add">
+                <select id="chartingMetricSelect" class="charting-select">
+                  <option value="volume">Volume</option>
+                  <option value="rsi">RSI</option>
+                  <option value="drawdown">Drawdown</option>
+                  <option value="sharpe">Sharpe</option>
+                  <option value="zscore">Z-Score</option>
+                  <option value="ma">Moving Average</option>
+                  <option value="bollinger">Bollinger</option>
+                  <option value="corr">Correlation</option>
+                </select>
+                <button id="chartingAddMetricBtn" class="btn btn-ghost">Add Metric</button>
+              </div>
+              <div id="chartingMetricList" class="charting-list"></div>
+            </div>
+
+            <div class="charting-section">
+              <div class="charting-section-title">Templates</div>
+              <div class="charting-input-row">
+                <input id="chartingTemplateName" class="charting-input" type="text" placeholder="Template name" />
+                <button id="chartingSaveTemplateBtn" class="btn btn-ghost">Save</button>
+              </div>
+              <div id="chartingTemplateList" class="charting-list"></div>
+            </div>
+          </div>
+
+          <div class="charting-main">
+            <div class="chart-wrap">
+            <div class="qs-resize-handle qs-resize-right" title="Resize"></div>
+            <div class="qs-resize-handle qs-resize-bottom" title="Resize"></div>
+            <div class="chart-toolbar">
+          <div class="chart-title-wrap">
+            <button id="chartingCollapseBtn" class="charting-collapse" title="Hide selections" aria-label="Hide selections">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M7 6h10M7 12h10M7 18h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                <path d="M4 12h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+            </button>
+            <div id="chartTitle" class="chart-title">—</div>
+            <div id="chartSubtitle" class="chart-subtitle">—</div>
+          </div>
+
+          <div class="chart-actions">
+            <!-- camera -->
+            <button id="snapshotBtn" class="iconbtn" title="Snapshot">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 7h3l2-2h6l2 2h3v12H4V7z"></path>
+                <circle cx="12" cy="13" r="3.2"></circle>
+              </svg>
+            </button>
+
+            <button id="chartTableBtn" class="iconbtn" title="Show table" aria-label="Show table">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="4" y="6" width="16" height="12" rx="1.2"></rect>
+                <path d="M4 10h16M4 14h16M9 6v12M15 6v12"></path>
+              </svg>
+            </button>
+
+            <!-- save -->
+            <button id="saveBtn" class="iconbtn" title="Save to Library">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M5 4h12l2 2v14H5V4z"></path>
+                <path d="M8 4v6h8V4"></path>
+                <path d="M8 20v-6h8v6"></path>
+              </svg>
+            </button>
+
+            <!-- Copy JSON removed -->
+
+            <!-- Settings -->
+            <button id="gearBtn" class="iconbtn" title="Settings" aria-label="Settings">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="6" cy="12" r="1.6" fill="currentColor"></circle>
+                <circle cx="12" cy="12" r="1.6" fill="currentColor"></circle>
+                <circle cx="18" cy="12" r="1.6" fill="currentColor"></circle>
+              </svg>
+            </button>
+            <div id="gearPopover" class="popover" hidden>
+              <div class="menu">
+                <label class="menuitem" style="display:flex; gap:8px; align-items:center;">
+                  <input type="checkbox" id="gridToggle" />
+                  <span>Gridlines</span>
+                </label>
+
+                <button class="menuitem" id="menuColorBtn">Colour</button>
+
+                <div class="menuitem" style="display:flex; gap:8px; align-items:center;">
+                  <span style="min-width:70px;">Format</span>
+                  <select id="chartTypeSel" style="flex:1;">
+                    <option value="line">Line</option>
+                    <option value="candles">Candles</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- ===== TA Overlays ===== -->
+            <div class="toolbtn-wrap" id="taWrap">
+              <button class="iconbtn" id="taBtn" title="TA Overlays" aria-label="TA Overlays">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M12 2 21 7 12 12 3 7 12 2Z" stroke="currentColor" stroke-width="1.8"/>
+                  <path d="M21 11 12 16 3 11" stroke="currentColor" stroke-width="1.8"/>
+                  <path d="M21 15 12 20 3 15" stroke="currentColor" stroke-width="1.8"/>
+                </svg>
+                <span class="bubble">TA Overlays</span>
+              </button>
+
+              <div class="popover" id="taPopover" hidden>
+                <div class="popover-title">TA Overlays</div>
+                <div class="row" style="gap:8px; align-items:center;">
+                  <span class="rowlabel">Indicator</span>
+                  <select id="taSelect" class="mini" style="flex:1;">
+                    <option value="bb">Bollinger (20, 2)</option>
+                    <option value="sma">SMA</option>
+                    <option value="ema">EMA</option>
+                  </select>
+                  <button class="pillbtn" id="taAddBtn">Add</button>
+                </div>
+                <div class="divider"></div>
+                <div id="taList" class="ta-list"></div>
+              </div>
+            </div>
+
+            <!-- ===== Add Panel (removed) ===== -->
+          </div>
+        </div>
+
+            <div class="chart-inner" id="chartInner">
+              <div id="yUnit" class="yunit"></div>
+              <div class="chart-canvas-wrap">
+                <canvas id="chart"></canvas>
+              </div>
+              <div id="panelStack" class="panel-stack"></div>
+            </div>
+            <div id="chartTableWrap" class="chart-table-wrap" hidden>
+              <div class="chart-table-head">
+                <div>Data</div>
+                <div class="chart-table-actions">
+                  <button id="chartTableRemoveBtn" class="iconbtn" title="Remove table" aria-label="Remove table">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+                    </svg>
+                  </button>
+                  <button id="chartTableCopyBtn" class="iconbtn" title="Copy table" aria-label="Copy table">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <rect x="7" y="7" width="10" height="12" rx="1.5"></rect>
+                      <rect x="4" y="4" width="10" height="12" rx="1.5"></rect>
+                    </svg>
+                  </button>
+                  <button id="chartTableExportBtn" class="iconbtn" title="Export CSV" aria-label="Export CSV">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M12 3v12M8 11l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+                      <path d="M5 19h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div id="chartTableBody" class="chart-table-body"></div>
+            </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="module module-seasonality" data-module="seasonality">
+        <div class="seasonality-wrap">
+          <div class="seasonality-toolbar">
+            <div class="chart-title">Seasonality</div>
+            <div class="seasonality-actions">
+              <button id="seasonalitySnapBtn" class="iconbtn" title="Snapshot">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 7h3l2-2h6l2 2h3v12H4V7z"></path>
+                  <circle cx="12" cy="13" r="3.2"></circle>
+                </svg>
+              </button>
+              <button id="seasonalitySaveBtn" class="iconbtn" title="Save to Library">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M5 4h12l2 2v14H5V4z"></path>
+                  <path d="M8 4v6h8V4"></path>
+                  <path d="M8 20v-6h8v6"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div class="seasonality-panel" id="seasonalityModulePanel"></div>
+        </div>
+      </div>
+
+      <div class="module module-portfolio" data-module="portfolio">
+        <div class="module-placeholder">Portfolio analysis module (placeholder)</div>
+      </div>
+
+      <div class="module module-regressions" data-module="regressions">
+        <div class="module-placeholder">Regressions module (placeholder)</div>
+      </div>
+
+      <div class="module module-market" data-module="market">
+        <div class="module-placeholder">Market overview module (placeholder)</div>
+      </div>
+
+      <div class="input-wrap">
+        <div class="qs-resize-handle qs-resize-right" title="Resize"></div>
+        <div class="qs-resize-handle qs-resize-bottom" title="Resize"></div>
+        <div class="qs-input-grab" title="Drag to resize"></div>
+        <div class="input-head">
+          <div class="input-title">Command / Expression</div>
+          <div class="hint">Ctrl/Cmd+Enter runs · Enter newline</div>
+        </div>
+
+        <div class="input-row">
+          <div class="cmd-scrollbar"><div class="cmd-scrollbar-thumb"></div></div>
+          <div class="cmd-display" aria-hidden="true"></div>
+          <textarea
+            id="cmd"
+            class="cmd"
+            rows="3"
+            spellcheck="false"
+            autocomplete="off"
+            autocapitalize="off"
+            autocorrect="off"
+            placeholder="What would you like to chart today?"
+          ></textarea>
+
+          <button id="runBtn" class="btn btn-run">Run</button>
+        </div>
+
+        <div id="msg" class="msg">OK</div>
+      </div>
+    </main>
+  </div>
+
+  <script src="./ui.js"></script>
+</body>
+</html>

@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import time
+import os
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from quant_sandbox.api.debug import router as debug_router
 from quant_sandbox.api.metrics import router as metrics_router
+from quant_sandbox.api.data_ohlcv import router as data_ohlcv_router
 from quant_sandbox.providers.ibkr_worker import IBKRWorker
 
 
@@ -40,18 +43,21 @@ def _wait_for_worker_ready(worker: IBKRWorker, timeout_s: float = 15.0) -> None:
 
 
 def create_app() -> FastAPI:
-    app = FastAPI()
+    app = FastAPI(title="Quant Sandbox")
 
-    # ✅ INCLUDE ROUTERS HERE (ONCE)
+    # ---------------------------
+    # API routes FIRST (important)
+    # ---------------------------
     app.include_router(debug_router)
     app.include_router(metrics_router)
-
-    # Construct worker (do NOT start yet)
-    app.state.ibkr_worker = IBKRWorker()
+    app.include_router(data_ohlcv_router)  # <-- THIS was missing from the running app
 
     @app.get("/health")
     def health() -> dict:
         return {"status": "ok"}
+
+    # Construct worker (do NOT start yet)
+    app.state.ibkr_worker = IBKRWorker()
 
     @app.on_event("startup")
     def on_startup() -> None:
@@ -67,8 +73,28 @@ def create_app() -> FastAPI:
         except Exception:
             pass
 
+    # ---------------------------
+    # Static UIs LAST (important)
+    # ---------------------------
+    API_DIR = os.path.abspath(os.path.dirname(__file__))   # .../src/quant_sandbox/api
+    QS_DIR = os.path.abspath(os.path.join(API_DIR, ".."))  # .../src/quant_sandbox
+    UI_DIR = os.path.join(QS_DIR, "ui")                    # existing UI
+    UI_TMP_DIR = os.path.join(API_DIR, "ui_tmp")           # temp UI
+
+    if os.path.isdir(UI_DIR):
+        app.mount("/ui", StaticFiles(directory=UI_DIR, html=True), name="ui")
+        print(f"[ui] Mounted /ui -> {UI_DIR}")
+    else:
+        print(f"[ui] Not mounted (missing folder): {UI_DIR}")
+
+    if os.path.isdir(UI_TMP_DIR):
+        app.mount("/ui_tmp", StaticFiles(directory=UI_TMP_DIR, html=True), name="ui_tmp")
+        print(f"[ui_tmp] Mounted /ui_tmp -> {UI_TMP_DIR}")
+    else:
+        print(f"[ui_tmp] Not mounted (missing folder): {UI_TMP_DIR}")
+
     return app
 
 
-# ✅ THIS is what uvicorn loads
+# uvicorn loads this
 app = create_app()

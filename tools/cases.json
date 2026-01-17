@@ -1,0 +1,161 @@
+{
+  "series_spy": {
+    "method": "POST",
+    "path": "/expr/series",
+    "payload": {
+      "expr": "EQ:SPY",
+      "duration": "30 D",
+      "bar_size": "1 day",
+      "use_rth": true
+    },
+    "expect": {
+      "required_keys": ["expr", "label", "count", "points"],
+      "require_non_empty_series": true
+    },
+    "tags": ["core", "expr"]
+  },
+
+  "chart_spy": {
+    "method": "POST",
+    "path": "/expr/chart",
+    "payload": {
+      "expr": "EQ:SPY",
+      "duration": "30 D",
+      "bar_size": "1 day",
+      "use_rth": true
+    },
+    "expect": {
+      "required_keys": ["expr", "series", "meta"],
+      "require_non_empty_series": true
+    },
+    "tags": ["core", "expr"]
+  },
+
+  "pack_spy_full": {
+    "method": "POST",
+    "path": "/expr/pack",
+    "payload": {
+      "expr": "EQ:SPY",
+      "want": ["price", "rsi", "bb", "drawdown", "sharpe", "stats"],
+      "duration": "3 Y",
+      "bar_size": "1 day",
+      "use_rth": true
+    },
+    "expect": {
+      "required_keys": ["expr", "series", "stats", "meta"],
+      "require_non_empty_series": true
+    },
+    "tags": ["core", "pack"]
+  },
+
+  "corr_spy_qqq": {
+    "method": "POST",
+    "path": "/expr/corr",
+    "payload": {
+      "a": "EQ:SPY",
+      "b": "EQ:QQQ",
+      "duration": "5 Y",
+      "bar_size": "1 day",
+      "use_rth": true,
+      "ret_horizon": "3D",
+      "window": "3M"
+    },
+    "expect": {
+      "required_keys": ["series", "stats", "meta"],
+      "require_non_empty_series": true
+    },
+    "tags": ["corr", "expr"]
+  },
+
+  "zscore_spy": {
+    "method": "POST",
+    "path": "/expr/zscore",
+    "payload": {
+      "expr": "EQ:SPY",
+      "duration": "10 Y",
+      "bar_size": "1 day",
+      "use_rth": true,
+      "window": "3M"
+    },
+    "expect": {
+      "required_keys": ["series", "stats", "meta"],
+      "require_non_empty_series": true
+    },
+    "tags": ["zscore", "expr"]
+  },
+
+  "seasonality_years_spy": {
+    "method": "POST",
+    "path": "/expr/seasonality/years",
+    "payload": {
+      "expr": "EQ:SPY",
+      "years": [2021, 2022, 2023, 2024, 2025],
+      "duration": "15 Y",
+      "bar_size": "1 day",
+      "use_rth": true,
+      "rebase": true
+    },
+    "expect": {
+      "required_keys": ["series", "tables", "meta"],
+      "require_non_empty_series": true
+    },
+    "tags": ["seasonality", "expr", "plot"]
+  },
+
+  "seasonality_heatmap_spy_month": {
+    "method": "POST",
+    "path": "/expr/seasonality/heatmap",
+    "payload": {
+      "expr": "EQ:SPY",
+      "duration": "25 Y",
+      "bar_size": "1 day",
+      "use_rth": true,
+      "bucket": "month"
+    },
+    "expect": {
+      "required_keys": ["tables", "meta"],
+      "require_non_empty_series": false
+    },
+    "tags": ["seasonality", "heatmap", "table"]
+  },
+
+  "compare_spy_2007_vs_2025": {
+    "method": "POST",
+    "path": "/expr/compare",
+    "payload": {
+      "expr": "EQ:SPY",
+      "a_start": "2007-06-01",
+      "a_end": "2007-12-31",
+      "b_start": "2025-01-01",
+      "b_end": "2025-06-30",
+      "duration": "30 Y",
+      "bar_size": "1 day",
+      "use_rth": true,
+      "rebase": true
+    },
+    "expect": {
+      "required_keys": ["series", "stats", "meta"],
+      "require_non_empty_series": true
+    },
+    "tags": ["compare", "expr", "plot"]
+      },
+
+    "seasonality_heatmap_spy_month_since_2010": {
+      "method": "POST",
+      "path": "/expr/seasonality/heatmap",
+      "payload": {
+        "expr": "EQ:SPY",
+        "duration": "25 Y",
+        "bar_size": "1 day",
+        "use_rth": true,
+        "bucket": "month",
+        "years": [2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022,2023,2024,2025]
+      },
+      "expect": {
+        "required_keys": ["tables", "meta"],
+        "require_non_empty_series": false
+      },
+      "tags": ["seasonality", "heatmap", "table"]
+    }
+  }
+

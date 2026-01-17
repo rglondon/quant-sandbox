@@ -12,5 +12,33 @@
     "multiplier": "100",
     "symbol": "GC",
     "tradingClass": "GC"
+  },
+  "N225": {
+    "currency": "JPY",
+    "exchange": "OSE.JPN",
+    "multiplier": "1000",
+    "symbol": "N225",
+    "tradingClass": "225"
+  },
+  "NG": {
+    "currency": "USD",
+    "exchange": "NYMEX",
+    "multiplier": "10000",
+    "symbol": "NG",
+    "tradingClass": "NG"
+  },
+  "NIFTY": {
+    "currency": "USD",
+    "exchange": "SGX",
+    "multiplier": "2",
+    "symbol": "NIFTY",
+    "tradingClass": "NIFTY"
+  },
+  "SX7E": {
+    "currency": "EUR",
+    "exchange": "EUREX",
+    "multiplier": "50",
+    "symbol": "SX7E",
+    "tradingClass": "FESB"
   }
 }

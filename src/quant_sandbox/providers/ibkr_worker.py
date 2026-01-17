@@ -449,7 +449,7 @@ class IBKRWorker:
             f"No expiries extracted for {product_key}. Tried:\n" + "\n".join("  - " + x for x in last_debug)
         )
 
-    # ----------------------------
+       # ----------------------------
     # Historical data
     # ----------------------------
 
@@ -490,24 +490,15 @@ class IBKRWorker:
 
         with self._lock:
             contract = make_contract(spec)
-
             q = await self._ib.qualifyContractsAsync(contract)
             if q:
                 contract = q[0]
 
-            spec_l = spec.lower()
+            is_fx = spec.lower().startswith("fx:")
+            is_fut = spec.lower().startswith(("future:", "futuresel:", "futurecode:"))
 
-            # whatToShow:
-            if spec_l.startswith("fx:"):
-                what = "MIDPOINT"
-            elif spec_l.startswith("future:") or spec_l.startswith("futuresel:") or spec_l.startswith("futurecode:"):
-                what = "MIDPOINT"
-            else:
-                what = "TRADES"
-
-            # Clear "recent error" so we don't report a stale unrelated one
-            self._last_ib_error = None
-            self._last_ib_error_ts = 0.0
+            what = "MIDPOINT" if is_fx else "TRADES"
+            useRTH = False if (is_fx or is_fut) else use_rth
 
             bars = await self._ib.reqHistoricalDataAsync(
                 contract,
@@ -515,14 +506,11 @@ class IBKRWorker:
                 durationStr=duration,
                 barSizeSetting=bar_size,
                 whatToShow=what,
-                useRTH=use_rth,
+                useRTH=useRTH,
                 formatDate=1,
             )
 
         if not bars:
-            # If IBKR emitted an error very recently, surface it
-            if self._last_ib_error and (time.time() - self._last_ib_error_ts) < 10.0:
-                raise IBKRWorkerError(f"No data returned from IBKR. Last error: {self._last_ib_error}")
             return pd.Series(dtype="float64")
 
         df = util.df(bars)
@@ -531,3 +519,123 @@ class IBKRWorker:
 
         df["date"] = pd.to_datetime(df["date"])
         return df.set_index("date")["close"].astype("float64")
+
+    # ----------------------------
+    # NEW: OHLCV bars
+    # ----------------------------
+
+    def get_ohlcv(
+        self,
+        symbol: str,
+        start: str,
+        end: str,
+        resolution: str,
+        tz: str = "UTC",
+        max_bars: int = 5000,
+        include_volume: bool = True,
+        adjust: str = "none",
+        timeout_s: float = 30.0,
+    ) -> List[Dict]:
+
+        if not self.ready.is_set():
+            raise IBKRWorkerError("IBKRWorker not ready")
+
+        if self._loop is None or self._ib is None:
+            raise IBKRWorkerError("IBKRWorker loop/IB not initialized")
+
+        fut = asyncio.run_coroutine_threadsafe(
+            self._get_ohlcv_async(
+                symbol=symbol,
+                start=start,
+                end=end,
+                resolution=resolution,
+                tz=tz,
+                max_bars=max_bars,
+                include_volume=include_volume,
+                adjust=adjust,
+            ),
+            self._loop,
+        )
+        return fut.result(timeout=timeout_s)
+
+    async def _get_ohlcv_async(
+        self,
+        symbol: str,
+        start: str,
+        end: str,
+        resolution: str,
+        tz: str,
+        max_bars: int,
+        include_volume: bool,
+        adjust: str,
+    ) -> List[Dict]:
+
+        assert self._ib is not None
+
+        bar_size = {
+            "1min": "1 min",
+            "5min": "5 mins",
+            "15min": "15 mins",
+            "30min": "30 mins",
+            "1H": "1 hour",
+            "4H": "4 hours",
+            "1D": "1 day",
+            "1W": "1 week",
+            "1M": "1 month",
+        }.get(resolution)
+
+        if bar_size is None:
+            raise IBKRWorkerError(f"Unsupported resolution: {resolution}")
+
+        start_ts = pd.Timestamp(start).tz_localize(None)
+        end_ts = pd.Timestamp(end).tz_localize(None)
+
+        if end_ts <= start_ts:
+            raise IBKRWorkerError("Invalid date range")
+
+        end_dt = end_ts.to_pydatetime()
+        days = max(1, (end_ts - start_ts).days)
+
+
+        if days > 365:
+            years = max(1, int((days + 364) // 365))  # ceiling division
+            duration_str = f"{years} Y"
+        else:
+            duration_str = f"{days} D"
+
+        contract = make_contract(symbol)
+        self._ib.qualifyContracts(contract)
+
+        what_list = ["MIDPOINT", "TRADES"] if symbol.startswith("FX:") else ["TRADES"]
+
+        bars = None
+        for what in what_list:
+            bars = await self._ib.reqHistoricalDataAsync(
+                contract,
+                endDateTime=end_dt,
+                durationStr=duration_str,
+                barSizeSetting=bar_size,
+                whatToShow=what,
+                useRTH=False,
+                formatDate=1,
+            )
+            if bars:
+                break
+
+        if not bars:
+            raise IBKRWorkerError("No OHLCV bars returned")
+
+        out: List[Dict] = []
+        for b in bars[-max_bars:]:
+            out.append(
+                {
+                    "t": pd.Timestamp(b.date).isoformat(),
+                    "o": float(b.open),
+                    "h": float(b.high),
+                    "l": float(b.low),
+                    "c": float(b.close),
+                    "v": float(b.volume) if include_volume and b.volume is not None else None,
+                }
+            )
+
+        return out

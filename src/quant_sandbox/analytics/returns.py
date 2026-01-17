@@ -1,4 +1,5 @@
 from __future__ import annotations
+from quant_sandbox.core.windows import window_to_periods, ensure_min_periods, Bar
 
 from dataclasses import dataclass
 from typing import Literal, Optional, Union
@@ -275,4 +276,51 @@ def rolling_sharpe_from_prices(
         annualization=annualization,
         rf_mode=rf_mode,
         min_periods=min_periods,
+    )
+def rolling_sharpe_human(
+    returns: pd.Series,
+    lookback: str,
+    *,
+    bar: Bar,
+    rf: Union[float, pd.Series] = 0.0,
+    annualization: Annualization = "infer",
+    rf_mode: RfMode = "annual",
+    min_periods_frac: float = 1.0,
+) -> pd.Series:
+    """
+    Rolling Sharpe where lookback is a human string like '2m', '10w', '1y',
+    and bar tells us what one period means.
+    """
+    win = window_to_periods(lookback, bar=bar)
+    min_p = ensure_min_periods(win, frac=min_periods_frac)
+    return rolling_sharpe(
+        returns,
+        window=win,
+        rf=rf,
+        annualization=annualization,
+        rf_mode=rf_mode,
+        min_periods=min_p,
+    )
+
+
+def rolling_sharpe_from_prices_human(
+    prices: pd.Series,
+    lookback: str,
+    *,
+    bar: Bar,
+    rf: Union[float, pd.Series] = 0.0,
+    annualization: Annualization = "infer",
+    rf_mode: RfMode = "annual",
+    use_log_returns: bool = False,
+    min_periods_frac: float = 1.0,
+) -> pd.Series:
+    r = to_log_returns(prices) if use_log_returns else to_simple_returns(prices)
+    return rolling_sharpe_human(
+        r,
+        lookback=lookback,
+        bar=bar,
+        rf=rf,
+        annualization=annualization,
+        rf_mode=rf_mode,
+        min_periods_frac=min_periods_frac,
     )
