@@ -271,11 +271,11 @@ if bench_returns:
         beta = rolling_beta(port_ret, bret, window=63)
         if _HAS_PLOTLY:
             fig = go.Figure()
-            fig.add_trace(go.Scatter(x=corr.index, y=corr.values, name=f\"{b} Corr (63D)\"))
-            fig.add_trace(go.Scatter(x=beta.index, y=beta.values, name=f\"{b} Beta (63D)\"))
+            fig.add_trace(go.Scatter(x=corr.index, y=corr.values, name=f"{b} Corr (63D)"))
+            fig.add_trace(go.Scatter(x=beta.index, y=beta.values, name=f"{b} Beta (63D)"))
             bench_cols[1].plotly_chart(fig, use_container_width=True)
         else:
-            bench_cols[1].line_chart(pd.DataFrame({\"corr\": corr, \"beta\": beta}).dropna(), height=180)
+            bench_cols[1].line_chart(pd.DataFrame({"corr": corr, "beta": beta}).dropna(), height=180)
 
 # Factor regression (market + macro)
 factor_series = {}
