@@ -7,6 +7,66 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
+# Allow running as a script (streamlit) without package context
+try:
+    from .data_fetcher import (
+        IBKRConfig,
+        connect_ibkr,
+        fetch_account_summary,
+        fetch_positions,
+        fetch_history_bulk,
+        fetch_adv20,
+        fetch_executions,
+    )
+    from .risk_engine import (
+        compute_returns,
+        compute_var,
+        max_drawdown,
+        portfolio_returns,
+        rolling_vol,
+        sharpe_ratio,
+        sortino_ratio,
+        beta_vs_benchmark,
+        rolling_beta,
+        rolling_corr,
+        factor_exposure,
+    )
+    from .store import SnapshotStore
+    from .factors import load_local_series, save_local_series
+    from .ledger import build_lots_from_fills
+except Exception:  # pragma: no cover
+    import sys
+    from pathlib import Path
+
+    HERE = Path(__file__).resolve().parent
+    sys.path.insert(0, str(HERE))
+
+    from data_fetcher import (
+        IBKRConfig,
+        connect_ibkr,
+        fetch_account_summary,
+        fetch_positions,
+        fetch_history_bulk,
+        fetch_adv20,
+        fetch_executions,
+    )
+    from risk_engine import (
+        compute_returns,
+        compute_var,
+        max_drawdown,
+        portfolio_returns,
+        rolling_vol,
+        sharpe_ratio,
+        sortino_ratio,
+        beta_vs_benchmark,
+        rolling_beta,
+        rolling_corr,
+        factor_exposure,
+    )
+    from store import SnapshotStore
+    from factors import load_local_series, save_local_series
+    from ledger import build_lots_from_fills
+
 try:
     from st_aggrid import AgGrid, GridOptionsBuilder  # type: ignore
     _HAS_AGGRID = True
@@ -34,31 +94,6 @@ except Exception:
     except Exception:
         Contract = None  # type: ignore
 
-from .data_fetcher import (
-    IBKRConfig,
-    connect_ibkr,
-    fetch_account_summary,
-    fetch_positions,
-    fetch_history_bulk,
-    fetch_adv20,
-    fetch_executions,
-)
-from .risk_engine import (
-    compute_returns,
-    compute_var,
-    max_drawdown,
-    portfolio_returns,
-    rolling_vol,
-    sharpe_ratio,
-    sortino_ratio,
-    beta_vs_benchmark,
-    rolling_beta,
-    rolling_corr,
-    factor_exposure,
-)
-from .store import SnapshotStore
-from .factors import load_local_series, save_local_series
-from .ledger import build_lots_from_fills
 
 
 st.set_page_config(page_title="Quant Sandbox Portfolio", layout="wide")
