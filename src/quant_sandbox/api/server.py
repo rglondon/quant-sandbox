@@ -62,8 +62,13 @@ def create_app() -> FastAPI:
     @app.on_event("startup")
     def on_startup() -> None:
         worker: IBKRWorker = app.state.ibkr_worker
-        worker.start()
-        _wait_for_worker_ready(worker, timeout_s=15.0)
+        try:
+            worker.start()
+            _wait_for_worker_ready(worker, timeout_s=5.0)
+            print("[ibkr] IBKR Worker connected successfully")
+        except Exception as e:
+            print(f"[ibkr] IBKR Worker unavailable (expected if TWS/IBG not running): {e}")
+            # Continue without IBKR - worker will remain in non-ready state
 
     @app.on_event("shutdown")
     def on_shutdown() -> None:
