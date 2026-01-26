@@ -11,6 +11,7 @@ from quant_sandbox.api.debug import router as debug_router
 from quant_sandbox.api.metrics import router as metrics_router
 from quant_sandbox.api.data_ohlcv import router as data_ohlcv_router
 from quant_sandbox.providers.ibkr_worker import IBKRWorker
+from quant_sandbox.api.portfolio import router as portfolio_router
 
 
 def _wait_for_worker_ready(worker: IBKRWorker, timeout_s: float = 15.0) -> None:
@@ -51,6 +52,7 @@ def create_app() -> FastAPI:
     app.include_router(debug_router)
     app.include_router(metrics_router)
     app.include_router(data_ohlcv_router)  # <-- THIS was missing from the running app
+    app.include_router(portfolio_router)
 
     @app.get("/health")
     def health() -> dict:
